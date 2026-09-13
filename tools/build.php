@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
-$output = $argv[1] ?? $root . '/build/InventoryLibs-0.1.0.phar';
+$output = $argv[1] ?? $root . '/build/InventoryLibs-0.1.1.phar';
 if(file_exists($output)){
 	throw new RuntimeException("Output already exists: $output");
 }

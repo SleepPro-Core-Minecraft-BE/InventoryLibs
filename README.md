@@ -5,7 +5,7 @@
 
 ## Установка
 
-1. Скачайте `InventoryLibs-0.1.0.phar` из [релизов](https://github.com/SleepPro-Core-Minecraft-BE/InventoryLibs/releases).
+1. Скачайте `InventoryLibs-0.1.1.phar` из [релизов](https://github.com/SleepPro-Core-Minecraft-BE/InventoryLibs/releases).
 2. Поместите файл в `plugins/` и перезапустите сервер.
 3. В плагине, использующем библиотеку, укажите:
 
@@ -13,7 +13,7 @@
 depend: [InventoryLibs]
 ```
 
-Требуется API 5.41.0 или новее. InventoryLibs автоматически регистрирует
+Требуется API 5.44.2 или новее. InventoryLibs автоматически регистрирует
 обработчики; повторная регистрация в вашем плагине не нужна.
 
 ## Создание меню
@@ -104,7 +104,9 @@ $menu->setInventoryCloseListener(static function(Player $player, Inventory $inve
 
 На сервере с `devtools-mode: true` скопируйте `tests/InventoryLibs` в
 `plugins/InventoryLibsTest`. Команда `/invtest` открывает сундук с изумрудом,
-алмазом и золотом. Нажатия выводят номер слота; предметы нельзя забрать.
+алмазом и золотом на защищённой странице: предметы нельзя забрать или положить.
+Стрелка переключает на вторую страницу, где перенос предметов разрешён.
+При закрытии второй страницы оставленные предметы возвращаются игроку.
 Разрешение `inventorylibs.test` по умолчанию выдано операторам.
 
 Тестовый плагин отдельно от библиотеки и не включён в её PHAR.
@@ -132,7 +134,7 @@ $menu->setInventoryCloseListener(static function(Player $player, Inventory $inve
 php -d phar.readonly=0 tools/build.php
 ```
 
-Результат: `build/InventoryLibs-0.1.0.phar`. Существующий файл не перезаписывается;
+Результат: `build/InventoryLibs-0.1.1.phar`. Существующий файл не перезаписывается;
 для повторной сборки передайте новый путь первым аргументом.
 
 ## Авторство

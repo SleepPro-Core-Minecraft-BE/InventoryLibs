@@ -1,7 +1,7 @@
 name: InventoryLibsTest
 main: m1rage\invlibstest\Loader
 version: 1.0.0
-api: 5.41.0
+api: 5.44.2
 depend: [InventoryLibs]
 permissions:
   inventorylibs.test:

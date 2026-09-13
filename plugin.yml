@@ -1,7 +1,7 @@
 name: InventoryLibs
 main: m1rage\invlibs\Loader
-version: 0.1.0
-api: 5.41.0
+version: 0.1.1
+api: 5.44.2
 load: STARTUP
 authors: [m1rage, Muqsit]
 description: InvMenu-based virtual inventory library for SleepPro Public.
