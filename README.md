@@ -1,4 +1,45 @@
-# InvMenu
+# InventoryLibs
+
+Форк [InvMenu Muqsit](https://github.com/Muqsit/InvMenu) для публичного SleepPro.
+Устанавливается как обычный плагин; регистрация InvMenu выполняется автоматически.
+Главный класс: `src/m1rage/invlibs/Loader.php`. Фабрика и менеджер вынесены отдельно.
+
+## Использование
+
+1. Положите `InventoryLibs-0.1.0.phar` в `plugins/` и перезапустите сервер.
+2. Добавьте `depend: [InventoryLibs]` в `plugin.yml` своего плагина.
+3. Используйте существующий API InvMenu либо фабрику:
+
+```php
+use m1rage\invlibs\Loader;
+use pocketmine\item\VanillaItems;
+
+$library = $this->getServer()->getPluginManager()->getPlugin('InventoryLibs');
+if($library instanceof Loader && $library->isEnabled()){
+    $menu = $library->getManager()->getFactory()->chest('Меню', readonly: true);
+    $menu->getInventory()->setItem(13, VanillaItems::DIAMOND());
+    $menu->send($player);
+}
+```
+
+Фабрика поддерживает `chest()`, `doubleChest()`, `hopper()` и `create()`.
+Сетевое открытие, закрытие и транзакции обслуживаются исходными классами InvMenu.
+Не подключайте вторую незашейденную копию InvMenu вместе с этой библиотекой.
+Виртуальные меню сами по себе не являются постоянным хранилищем предметов.
+
+## Сборка
+
+```sh
+php -d phar.readonly=0 tools/build.php
+```
+
+Требуется API 5.41.0 или новее. Основа — InvMenu 4.7.4; лицензия GPL-3.0
+и история оригинала сохранены. Подробности: [NOTICE.md](NOTICE.md).
+
+---
+
+## Оригинальная документация InvMenu
+
 Create and manage virtual inventories in PocketMine-MP.
 
 ## Installation and setup

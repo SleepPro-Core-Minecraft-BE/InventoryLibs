@@ -1,6 +1,6 @@
 {
-    "name": "muqsit/invmenu",
-    "description": "A PocketMine-MP virion to create and manage virtual inventories!",
+    "name": "sleeppro-core-minecraft-be/inventorylibs",
+    "description": "InvMenu-based virtual inventory plugin for SleepPro Public",
     "type": "library",
     "license": "GPL-3.0",
     "require": {
