@@ -1,0 +1,2 @@
+# Enable only in an isolated automated test server.
+shutdown-after-test: false

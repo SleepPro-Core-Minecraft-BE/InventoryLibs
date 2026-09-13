@@ -1,0 +1,9 @@
+name: InventoryLibsTest
+main: m1rage\invlibstest\Loader
+version: 1.0.0
+api: 5.41.0
+depend: [InventoryLibs]
+permissions:
+  inventorylibs.test:
+    default: op
+    description: Open the InventoryLibs test chest.

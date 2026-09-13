@@ -1,31 +1,130 @@
 # InventoryLibs
 
-Форк [InvMenu Muqsit](https://github.com/Muqsit/InvMenu) для публичного SleepPro.
-Устанавливается как обычный плагин; регистрация InvMenu выполняется автоматически.
-Главный класс: `src/m1rage/invlibs/Loader.php`. Фабрика и менеджер вынесены отдельно.
+Библиотека виртуальных инвентарей для **SleepPro Public**. Создавайте сундуки,
+меню выбора и интерфейсы с обработкой нажатий без размещения блоков в мире.
 
-## Использование
+## Установка
 
-1. Положите `InventoryLibs-0.1.0.phar` в `plugins/` и перезапустите сервер.
-2. Добавьте `depend: [InventoryLibs]` в `plugin.yml` своего плагина.
-3. Используйте существующий API InvMenu либо фабрику:
+1. Скачайте `InventoryLibs-0.1.0.phar` из [релизов](https://github.com/SleepPro-Core-Minecraft-BE/InventoryLibs/releases).
+2. Поместите файл в `plugins/` и перезапустите сервер.
+3. В плагине, использующем библиотеку, укажите:
+
+```yaml
+depend: [InventoryLibs]
+```
+
+Требуется API 5.41.0 или новее. InventoryLibs автоматически регистрирует
+обработчики; повторная регистрация в вашем плагине не нужна.
+
+## Создание меню
 
 ```php
 use m1rage\invlibs\Loader;
 use pocketmine\item\VanillaItems;
 
 $library = $this->getServer()->getPluginManager()->getPlugin('InventoryLibs');
-if($library instanceof Loader && $library->isEnabled()){
-    $menu = $library->getManager()->getFactory()->chest('Меню', readonly: true);
-    $menu->getInventory()->setItem(13, VanillaItems::DIAMOND());
-    $menu->send($player);
+if(!$library instanceof Loader || !$library->isEnabled()){
+    throw new \LogicException('InventoryLibs не загружен');
 }
+
+$factory = $library->getManager()->getFactory();
+$menu = $factory->chest('Выбор предмета', readonly: true);
+$menu->getInventory()->setItem(13, VanillaItems::DIAMOND());
+$menu->send($player);
 ```
 
-Фабрика поддерживает `chest()`, `doubleChest()`, `hopper()` и `create()`.
-Сетевое открытие, закрытие и транзакции обслуживаются исходными классами InvMenu.
-Не подключайте вторую незашейденную копию InvMenu вместе с этой библиотекой.
-Виртуальные меню сами по себе не являются постоянным хранилищем предметов.
+| Метод фабрики | Размер |
+| --- | --- |
+| `chest()` | 27 слотов |
+| `doubleChest()` | 54 слота |
+| `hopper()` | 5 слотов |
+
+Все методы принимают название и `readonly`. По умолчанию предметы можно
+перемещать; для интерфейсов выбора используйте `readonly: true`.
+`create($type, $name, $readonly)` позволяет использовать зарегистрированный тип.
+
+## Обработка нажатий
+
+Меню только для чтения отменяет перемещение предметов, но позволяет обрабатывать
+нажатия. Если заменяете обработчик, используйте `InventoryLibs::readonly()`:
+
+```php
+use m1rage\invlibs\InventoryLibs;
+use m1rage\invlibs\transaction\DeterministicInventoryLibsTransaction;
+
+$menu->setListener(InventoryLibs::readonly(
+    static function(DeterministicInventoryLibsTransaction $transaction) : void{
+        $player = $transaction->getPlayer();
+        $slot = $transaction->getAction()->getSlot();
+        $player->sendMessage("Выбран слот $slot");
+    }
+));
+```
+
+Для меню с перемещением предметов обработчик возвращает решение:
+
+```php
+use m1rage\invlibs\transaction\InventoryLibsTransaction;
+use m1rage\invlibs\transaction\InventoryLibsTransactionResult;
+
+$menu->setListener(static function(InventoryLibsTransaction $transaction) : InventoryLibsTransactionResult{
+    return $transaction->getAction()->getSlot() === 0
+        ? $transaction->discard()
+        : $transaction->continue();
+});
+```
+
+## Открытие и закрытие
+
+`send()` асинхронный: библиотека синхронизирует открытие с клиентом.
+Результат можно проверить callback-функцией:
+
+```php
+$menu->send($player, callback: static function(bool $success) use($player) : void{
+    if(!$success){
+        $player->sendMessage('Не удалось открыть меню');
+    }
+});
+```
+
+```php
+use pocketmine\inventory\Inventory;
+use pocketmine\player\Player;
+
+$menu->setInventoryCloseListener(static function(Player $player, Inventory $inventory) : void{
+    $player->sendMessage('Меню закрыто');
+});
+```
+
+Для открытия следующего интерфейса из обработчика клика используйте
+`$transaction->then(...)`: действие выполнится после завершения транзакции.
+Не открывайте новое окно в середине обработки перемещения предметов.
+
+## Тестовый сундук
+
+На сервере с `devtools-mode: true` скопируйте `tests/InventoryLibs` в
+`plugins/InventoryLibsTest`. Команда `/invtest` открывает сундук с изумрудом,
+алмазом и золотом. Нажатия выводят номер слота; предметы нельзя забрать.
+Разрешение `inventorylibs.test` по умолчанию выдано операторам.
+
+Тестовый плагин отдельно от библиотеки и не включён в её PHAR.
+Он проверяет регистрацию, размеры меню, readonly и запись предметов.
+По умолчанию сервер не останавливается; `shutdown-after-test: true` предназначен
+только для изолированных автоматических проверок.
+
+## Структура
+
+- `src/m1rage/invlibs/Loader.php` — загрузка библиотеки.
+- `manager/MenuManager.php` — регистрация и доступ к фабрике.
+- `factory/MenuFactory.php` — создание меню.
+- `inventory/`, `transaction/`, `type/`, `session/` — инвентари, транзакции,
+  графика и сетевые сессии внутри `src/m1rage/invlibs/`.
+
+Все классы форка используют namespace `m1rage\invlibs`. Основной API:
+`InventoryLibs`, `InventoryLibsHandler`, `InventoryLibsTransaction` и
+`DeterministicInventoryLibsTransaction`. Старые имена классов не поддерживаются.
+Виртуальное меню не сохраняет предметы между перезапусками: постоянное
+хранение и обработку переполнения должен реализовать использующий плагин.
 
 ## Сборка
 
@@ -33,203 +132,11 @@ if($library instanceof Loader && $library->isEnabled()){
 php -d phar.readonly=0 tools/build.php
 ```
 
-Требуется API 5.41.0 или новее. Основа — InvMenu 4.7.4; лицензия GPL-3.0
-и история оригинала сохранены. Подробности: [NOTICE.md](NOTICE.md).
+Результат: `build/InventoryLibs-0.1.0.phar`. Существующий файл не перезаписывается;
+для повторной сборки передайте новый путь первым аргументом.
 
----
+## Авторство
 
-## Оригинальная документация InvMenu
-
-Create and manage virtual inventories in PocketMine-MP.
-
-## Installation and setup
-Download the compiled .phar file from [Poggit CI](https://poggit.pmmp.io/ci/Muqsit/InvMenu/~) and place it in your `virions/` folder.
-Read [installation](https://github.com/Muqsit/InvMenu/wiki/Installation) and [using in a plugin](https://github.com/Muqsit/InvMenu/wiki/Using-InvMenu-in-a-plugin)
-for a more elaborate guide on how to setup InvMenu library.
-
-> [!NOTE]
-> You must register `InvMenuHandler` before you can use InvMenu.
-> ```php
-> // in class MyPlugin extends PluginBase:
-> protected function onEnable() : void{
-> 	if(!InvMenuHandler::isRegistered()){
-> 		InvMenuHandler::register($this);
-> 	}
-> }
-
-## Create a virtual inventory
-Quick start, use `InvMenu::create(InvMenu::TYPE_CHEST)->send($player);` to display a virtual chest inventory to a player.
-
-`InvMenu::create($identifier)` creates an InvMenu instance. `$identifier` may be an identifier of a registered `InvMenuType` object.
-InvMenu comes with 3 pre-registered inventory types of different sizes:
-- `InvMenu::TYPE_CHEST` - a 27-slot normal chest inventory
-- `InvMenu::TYPE_DOUBLE_CHEST` - a 54-slot double chest inventory
-- `InvMenu::TYPE_HOPPER` - a 5-slot hopper inventory
-
-```php
-$menu = InvMenu::create(InvMenu::TYPE_CHEST);
-$inventory = $menu->getInventory();
-```
-
-As `$inventory` implements [PocketMine's Inventory interface](https://github.com/pmmp/PocketMine-MP/blob/stable/src/inventory/Inventory.php), you get to access all the fancy PocketMine inventory methods.
-```php
-$menu->getInventory()->setContents([
-	VanillaItems::DIAMOND_SWORD(),
-	VanillaItems::DIAMOND_PICKAXE()
-]);
-$menu->getInventory()->addItem(VanillaItems::DIAMOND_AXE());
-$menu->getInventory()->setItem(3, VanillaItems::GOLD_INGOT());
-```
-To send a menu to a player, use:
-```php
-/** @var Player $player */
-$menu->send($player);
-```
-> [!TIP]
-> One `InvMenu` can be sent to multiple players—even 2 players in different worlds, so everyone views and edits the same inventory as if it were one chest.
-
-
-## Set a custom name
-There are two ways to name an InvMenu. You can either specify a global name (see method A), or you can set a name at the time you send the menu (see method B).
-```php
-$menu->setName("Custom Name"); // method A
-$menu->send($player, "Greetings, " . $player->getName()); // method B
-```
-
-## Verify whether a menu is sent successfully
-`InvMenu::send()` is not guaranteed to succeed. A failure may arise from plugins cancelling InventoryOpenEvent, a disconnected player, or the player refusing the request (e.g., because they are in pause menu).
-Use the `$callback` parameter to verify whether a menu has been opened.
-```php
-$menu->send($player, callback: function(bool $success) : void{
-	if($success){
-		// player is viewing the menu
-	}
-});
-```
-
-## Monitor movement of items
-InvMenu comes with a listener whereby developers can write logic to monitor movement of items in and out of inventory, and thereby take action.
-A listener is a callback with the following signature:
-```php
-/**
- * @param InvMenuTransaction $transaction
- *
- * Return $transaction->continue() to continue the transaction.
- * Return $transaction->discard() to cancel the transaction.
- * @return InvMenuTransactionResult
- */
-Closure(InvMenuTransaction $transaction) : InvMenuTransactionResult;
-```
-- `InvMenuTransaction::getPlayer()` returns the `Player` that triggered the transaction.
-- `InvMenuTransaction::getItemClicked()` returns the `Item` the player clicked in the menu. You may also use `InvMenuTransaction::getOut()`.
-- `InvMenuTransaction::getItemClickedWith()` returns the `Item` the player had in their hand when clicking an item. You may also use `InvMenuTransaction::getIn()`.
-- `InvMenuTransaction::getAction()` returns `SlotChangeAction` - you can get the slot that the player clicked in the menu.
-- `InvMenuTransaction::getTransaction()` returns the complete `InventoryTransaction` holding all the above information.
-```php
-$menu->setListener(function(InvMenuTransaction $transaction) : InvMenuTransactionResult{
-	$player = $transaction->getPlayer();
-	$itemClicked = $transaction->getItemClicked();
-	$itemClickedWith = $transaction->getItemClickedWith();
-	$action = $transaction->getAction();
-	$txn = $transaction->getTransaction();
-	return $transaction->continue();
-});
-```
-The listener below does not allow players to take out apples from the menu:
-```php
-$menu->setListener(function(InvMenuTransaction $transaction) : InvMenuTransactionResult{
-	if($transaction->getItemClicked()->getTypeId() === ItemTypeIds::APPLE){
-		$player->sendMessage("You cannot take apples out of that inventory.");
-		return $transaction->discard();
-	}
-	return $transaction->continue();
-});
-```
-
-There are two methods you can use to prevent players from editing the menu. Either create a listener that `discard()`s
-the transaction, or use `InvMenu::readonly()`.
-```php
-$menu->setListener(function(InvMenuTransaction $transaction) : InvMenuTransactionResult{
-	return $transaction->discard();
-});
-
-$menu->setListener(InvMenu::readonly()); // equivalent shorthand of the above
-
-// you can also pass a callback in InvMenu::readonly()
-$menu->setListener(InvMenu::readonly(function(DeterministicInvMenuTransaction $transaction) : void{
-	// do something
-}));
-```
-Alternatively, you may choose to write your own `InventoryTransactionEvent` listener that works on transactions on
-`$menu->getInventory()`. However, an InvMenu listener is enough to fulfil most tasks.
-
-## Execute a task post-transaction
-Few actions are not possible to invoke at the time a player is viewing an inventory, such as sending a form—a player
-cannot view a form while viewing an inventory. Close the menu and utilize `InvMenuTransactionResult::then()` callback to
-achieve this.
-```php
-$menu->setListener(function(InvMenuTransaction $transaction) : InvMenuTransactionResult{
-	$transaction->getPlayer()->removeCurrentWindow();
-	return $transaction->discard()->then(function(Player $player) : void{
-		$player->sendForm(new Form());
-	});
-});
-
-// or if you are using InvMenu::readonly():
-$menu->setListener(InvMenu::readonly(function(DeterministicInvMenuTransaction $transaction) : void{
-	$transaction->getPlayer()->removeCurrentWindow();
-	$transaction->then(function(Player $player) : void{
-		$player->sendForm(new Form());
-	});
-}));
-```
-
-## Monitor menu close events
-Register an inventory close callback to run whenever a player closes the menu. An inventory close callback takes the
-following signature:
-```php
-/**
- * @param Player $player the player that closed the menu
- * @param Inventory $inventory the inventory of the menu
- */
-Closure(Player $player, Inventory $inventory) : void;
-```
-```php
-$menu->setInventoryCloseListener(function(Player $player, Inventory $inventory) : void{
-	$player->sendMessage("You are no longer viewing the menu.");
-});
-```
-Inventory close listener is fired during both—server-initiated requests (i.e., `$player->removeCurrentWindow()`) and
-when the player closes the inventory on their end.
-
-## Advanced usage: Register a custom InvMenuType
-> [!IMPORTANT]
-> PocketMine does not register a dispenser block. As of PocketMine v5, the task of registering missing vanilla blocks is
-> excessively laborious and hence beyond the scope of this guide. [pmmp/RegisterBlocksDemoPM5](https://github.com/pmmp/RegisterBlocksDemoPM5)
-> has a nice guide on how to achieve this. **Still overwhelmed?** I wrote a [drag-n-drop example plugin](https://gist.github.com/Muqsit/8884e0f75b317c332a56e01740bbfe98)
-> that does all of it and registers a `/dispenser` command. With DevTools plugin installed, simply copy the code and
-> paste it in a new "DispenserInvMenuPlugin.php" file in your server's plugin folder.
-
-InvMenu does not provide a 9-slot dispenser inventory. But you can still achieve this by registering a dispenser InvMenuType.
-You'll need to specify inventory size, block actor identifier (tile identifier), and the window type (network property) for
-the creation of the graphic (block) and inventory parts.
-```php
-public const TYPE_DISPENSER = "myplugin:dispenser";
-
-protected function onEnable() : void{
-	InvMenuHandler::getTypeRegistry()->register(self::TYPE_DISPENSER, InvMenuTypeBuilders::BLOCK_ACTOR_FIXED()
-		->setBlock(ExtraVanillaBlocks::DISPENSER())
-		->setSize(9)
-		->setBlockActorId("Dispenser")
-		->setNetworkWindowType(WindowTypes::DISPENSER)
-	->build());
-}
-```
-Sweet! Now you can create a dispenser menu using:
-```php
-$menu = InvMenu::create(self::TYPE_DISPENSER);
-```
-
-## InvMenu Wiki
-Applications, examples, tutorials and featured projects using InvMenu can be found on the [InvMenu Wiki](https://github.com/Muqsit/InvMenu/wiki/InvMenu-v4.0).
-
+Основа — InvMenu 4.7.4 Muqsit. Интеграция для SleepPro — m1rage.
+Лицензия GPL-3.0. История исходного проекта сохранена;
+подробности в [NOTICE.md](NOTICE.md), полный текст в [LICENSE](LICENSE).

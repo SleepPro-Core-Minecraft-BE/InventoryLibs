@@ -18,7 +18,7 @@
     "extra": {
         "virion": {
             "spec": "3.0",
-            "namespace-root": "muqsit\\invmenu"
+            "namespace-root": "m1rage\\invlibs"
         }
     }
 }

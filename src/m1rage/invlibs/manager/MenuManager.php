@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace m1rage\invlibs\manager;
 
 use m1rage\invlibs\factory\MenuFactory;
-use muqsit\invmenu\InvMenuHandler;
+use m1rage\invlibs\InventoryLibsHandler;
 use pocketmine\plugin\Plugin;
 
 final class MenuManager{
@@ -17,8 +17,8 @@ final class MenuManager{
 	}
 
 	public function register() : void{
-		if(!InvMenuHandler::isRegistered()){
-			InvMenuHandler::register($this->plugin);
+		if(!InventoryLibsHandler::isRegistered()){
+			InventoryLibsHandler::register($this->plugin);
 		}
 	}
 
